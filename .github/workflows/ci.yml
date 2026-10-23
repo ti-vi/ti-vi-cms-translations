@@ -1,0 +1,56 @@
+# The tests of every push to main and every pull request (tests/run.sh), and the build that release.yml
+# publishes: the files of a release are the ones these tests passed with (artifact "generated").
+# Actions are pinned by commit; the comment says the version.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to test and build (release.yml passes the tag)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Lint the scripts
+        run: |
+          shellcheck build.sh tests/run.sh
+          python3 -I -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' tests/integration.py
+
+      - name: es.po against default.pot (GNU gettext)
+        run: tests/run.sh po
+
+      - name: Unit tests
+        run: tests/run.sh unit
+
+      - name: Build
+        run: tests/run.sh build
+
+      - name: Integration (Xibo with the built files mounted)
+        run: tests/run.sh integration
+
+      - name: Untranslated interface strings (report only)
+        run: |
+          { echo '```'; ./build.sh --untranslated; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: generated
+          path: generated/
+          if-no-files-found: error
+          retention-days: 7

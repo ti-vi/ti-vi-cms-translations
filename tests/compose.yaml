@@ -1,0 +1,32 @@
+# Integration test (tests/run.sh integration): a throwaway Xibo CMS and its MySQL, with generated/es.mo and
+# es.json mounted as README.md says. Only the web port is published, on 127.0.0.1. The password is a test value:
+# the database lives in a tmpfs and is gone with "docker compose down".
+name: xibo-translations-test
+
+services:
+    cms-db:
+        image: mysql:8.4
+        environment:
+            MYSQL_DATABASE: cms
+            MYSQL_USER: cms
+            MYSQL_PASSWORD: test-only
+            MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+        tmpfs:
+            - /var/lib/mysql
+    cms-web:
+        image: "ghcr.io/xibosignage/xibo-cms:release-${XIBO_VERSION:?XIBO_VERSION not set}"
+        depends_on:
+            - cms-db
+        environment:
+            MYSQL_HOST: cms-db
+            MYSQL_PORT: "3306"
+            MYSQL_DATABASE: cms
+            MYSQL_USER: cms
+            MYSQL_PASSWORD: test-only
+            CMS_SERVER_NAME: cms.example.com
+            CMS_USAGE_REPORT: "false"
+        volumes:
+            - "../generated/es.mo:/var/www/cms/locale/es.mo:ro"
+            - "../generated/es.json:/var/www/cms/web/app/locale/langs/es.json:ro"
+        ports:
+            - "127.0.0.1:${TEST_PORT:-8099}:80"

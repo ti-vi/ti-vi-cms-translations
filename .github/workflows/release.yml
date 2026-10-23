@@ -1,0 +1,90 @@
+# Publishes a release when a tag <Xibo version>-<revision> is pushed (e.g. 4.5.5-1, for XIBO_VERSION 4.5.5):
+# the tests of ci.yml on that tag, then a GitHub release with the files they passed with and their SHA256SUMS.
+#
+# Run it by hand (workflow_dispatch) only to retry the release of an existing tag whose run failed. A published
+# release is never replaced: whoever uses it may have pinned its sha256. A fix is a new revision (4.5.5-2).
+# Actions are pinned by commit; the comment says the version.
+name: Release
+
+on:
+  push:
+    tags: ['[0-9]*.[0-9]*.[0-9]*-[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. 4.5.5-1)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+
+      - id: tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[1-9][0-9]*$ ]]; then
+            echo "::error::$TAG is not <Xibo version>-<revision> (e.g. 4.5.5-1)."
+            exit 1
+          fi
+          if [[ "${BASH_REMATCH[1]}" != "$(<XIBO_VERSION)" ]]; then
+            echo "::error::$TAG is not for the XIBO_VERSION of that commit ($(<XIBO_VERSION))."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: tag
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: refs/tags/${{ needs.tag.outputs.tag }}
+
+  release:
+    needs: [tag, test]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: generated
+          path: generated
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::The release $TAG already exists and is never replaced: publish a new revision."
+            exit 1
+          fi
+          cd generated
+          if [[ "$(<VERSION)" != "${TAG%-*}" ]]; then
+            echo "::error::The files were built for Xibo $(<VERSION), not ${TAG%-*}."
+            exit 1
+          fi
+          sha256sum es.mo es.json VERSION > SHA256SUMS
+          {
+            echo "Spanish (Latin America) translation of Xibo CMS ${TAG%-*}, revision ${TAG##*-}."
+            echo
+            echo "Only for Xibo ${TAG%-*}. How to install it: README.md."
+            echo
+            echo '```'
+            cat SHA256SUMS
+            echo '```'
+          } > ../notes.md
+          gh release create "$TAG" es.mo es.json VERSION SHA256SUMS --repo "$REPO" --verify-tag \
+            --title "$TAG" --notes-file ../notes.md
