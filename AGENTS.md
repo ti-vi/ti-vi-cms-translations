@@ -22,13 +22,13 @@ El repo es **público**: ni comentarios, ni documentación, ni mensajes nombran 
 | `es.upstream.json` | La traducción de Xibo de cada cadena en la última build. Lo escribe `build.sh` y se versiona: el informe de la siguiente versión de Xibo se compara con él. |
 | `build.sh`, `build.php`, `lib.php`, `untranslated.php` | La build y el listado de cadenas sin traducir. `lib.php` tiene las funciones que prueban los tests unitarios. |
 | `generated/` | El resultado. No se versiona. |
-| `tests/run.sh` | Los tests, los mismos que Actions: `po`, `unit`, `build` e `integration` (`tests/compose.yaml`, `tests/integration.py`). |
+| `tests/run.sh`, `tests/unit.php` | Los tests, los mismos que Actions: `po`, `unit` y `build`. No levantan ningún Xibo. |
 | `.github/workflows/ci.yml`, `release.yml` | Tests en cada push y pull request; release en cada tag. |
 
 ## Convenciones
 
 - Mensajes de los scripts, comentarios del código y `README.md`, en inglés. `AGENTS.md` y `docs/`, en español.
-- Solo Docker y Python 3 (biblioteca estándar) en el anfitrión. GNU gettext se usa desde un contenedor de Debian, y PHP desde la imagen de Xibo.
+- Solo Docker en el anfitrión. GNU gettext se usa desde un contenedor de Debian, y PHP desde la imagen de Xibo.
 - **Acciones de GitHub:**
   - solo las oficiales (`actions/*`), fijadas por commit con la versión en un comentario;
   - para cambiar de versión: el commit del tag, que tenga al menos dos semanas, y la lista de sus entradas en `action.yml`;
@@ -46,5 +46,5 @@ El repo es **público**: ni comentarios, ni documentación, ni mensajes nombran 
   2. aplicar el cambio con `./build.sh --normalize` y `./build.sh`;
   3. enseñar el diff de `es.po`.
 - Antes de dar por bueno un cambio: `tests/run.sh` y `shellcheck` en los scripts de bash. Con los workflows, también `actionlint`.
-- Los tests no inician sesión en Xibo: comprueban solo lo que se ve sin sesión (la página de login y `es.json`).
-- **Nunca** guardar cookies de sesión, tokens, contraseñas ni claves en ficheros del repo. La contraseña de `tests/compose.yaml` es un valor de prueba de un MySQL desechable. Si el usuario pasa información con secretos sin censurar, avisarle para que los rote.
+- Los tests de cada commit comprueban el catálogo y la build, sin levantar ningún Xibo (decisión del usuario): probar en un CMS queda fuera de su alcance. Se hace a mano al pasar a una versión nueva de Xibo (`docs/traducir.md`).
+- **Nunca** guardar cookies de sesión, tokens, contraseñas ni claves en ficheros del repo. Si el usuario pasa información con secretos sin censurar, avisarle para que los rote.

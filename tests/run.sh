@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The tests of the repository: the same steps GitHub Actions runs (.github/workflows/ci.yml). They need Docker,
-# and Python 3 for the integration test; everything else runs in throwaway containers.
+# The tests of the repository: the same steps GitHub Actions runs (.github/workflows/ci.yml). They only need
+# Docker: everything runs in throwaway containers. They check the catalogue and the build, not a running Xibo.
 #
-# Usage: tests/run.sh [po | unit | build | integration]...   (no argument: all of them, in this order)
+# Usage: tests/run.sh [po | unit | build]...   (no argument: all of them, in this order)
 #   po           es.po is in the canonical format of GNU gettext (msgcat), valid (msgfmt --check) and complete
 #                against the default.pot of the Xibo image (msgcmp)
 #   unit         tests/unit.php, with the PHP of the Xibo image
 #   build        ./build.sh, and es.upstream.json unchanged by it (it is committed after building)
-#   integration  a throwaway Xibo with generated/ mounted as README.md says (tests/compose.yaml), checked by
-#                tests/integration.py
 
 cd "$(dirname "$0")/.."
 
 VERSION=$(<XIBO_VERSION)
 IMAGE="ghcr.io/xibosignage/xibo-cms:release-$VERSION"
-PORT=${TEST_PORT:-8099}
-COMPOSE=(docker compose -f tests/compose.yaml)
-export XIBO_VERSION="$VERSION" TEST_PORT="$PORT"
 
 step() { echo -e "\n== $*"; }
 
@@ -54,30 +49,12 @@ test_build() {
     fi
 }
 
-test_integration() {
-    step "Integration: Xibo $VERSION with generated/ mounted (tests/compose.yaml, port $PORT)"
-    [[ -f generated/es.mo && -f generated/es.json ]] || { echo "FAIL: generated/ not built: run ./build.sh first."; return 1; }
-    trap '"${COMPOSE[@]}" down -v >/dev/null 2>&1' EXIT
-    "${COMPOSE[@]}" up -d --quiet-pull
-    local elapsed=0
-    until [[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login" || true)" == 200 ]]; do
-        if (( elapsed >= 600 )); then
-            "${COMPOSE[@]}" logs --tail 50 cms-web
-            echo "FAIL: Xibo did not answer /login in 10 minutes (logs above)."
-            return 1
-        fi
-        sleep 10
-        elapsed=$(( elapsed + 10 ))
-    done
-    python3 -I tests/integration.py "http://127.0.0.1:$PORT" || { "${COMPOSE[@]}" logs --tail 30 cms-web; return 1; }
-}
-
 tests=("$@")
-(( ${#tests[@]} )) || tests=(po unit build integration)
+(( ${#tests[@]} )) || tests=(po unit build)
 for t in "${tests[@]}"; do
     case "$t" in
-        po|unit|build|integration) "test_$t" ;;
-        *) echo "Usage: tests/run.sh [po | unit | build | integration]..." >&2; exit 1 ;;
+        po|unit|build) "test_$t" ;;
+        *) echo "Usage: tests/run.sh [po | unit | build]..." >&2; exit 1 ;;
     esac
 done
 echo -e "\nAll passed: ${tests[*]}."

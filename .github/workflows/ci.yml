@@ -20,7 +20,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -28,9 +28,7 @@ jobs:
           persist-credentials: false
 
       - name: Lint the scripts
-        run: |
-          shellcheck build.sh tests/run.sh
-          python3 -I -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' tests/integration.py
+        run: shellcheck build.sh tests/run.sh
 
       - name: es.po against default.pot (GNU gettext)
         run: tests/run.sh po
@@ -40,9 +38,6 @@ jobs:
 
       - name: Build
         run: tests/run.sh build
-
-      - name: Integration (Xibo with the built files mounted)
-        run: tests/run.sh integration
 
       - name: Untranslated interface strings (report only)
         run: |

@@ -56,12 +56,12 @@ A release is never replaced once published: a fix is a new revision (`4.5.5-2`),
 
 ## Build and test
 
-The catalogue is [`es.po`](es.po), a standard gettext file (Poedit, `msgfmt`). Building and testing only need Docker (and Python 3 for the integration test):
+The catalogue is [`es.po`](es.po), a standard gettext file (Poedit, `msgfmt`). Building and testing only need Docker:
 
 ```bash
 ./build.sh               # builds generated/ (es.mo, es.json, VERSION) for the Xibo version of XIBO_VERSION
 ./build.sh --normalize   # rewrites es.po in the canonical format of GNU gettext, after editing it
-tests/run.sh             # the tests of GitHub Actions: es.po, unit tests, build, and a throwaway Xibo with the files mounted
+tests/run.sh             # the tests of GitHub Actions: es.po against default.pot, unit tests and the build
 ```
 
 GitHub Actions runs the tests on every push and pull request ([`ci.yml`](.github/workflows/ci.yml)). A tag `<Xibo version>-<revision>` publishes a release with the files those tests passed with ([`release.yml`](.github/workflows/release.yml)).

@@ -39,7 +39,7 @@ Xibo tiene dos catálogos con las **mismas cadenas** (comprobado en 4.5.3):
   - Las cadenas propias de React traen ya marcadores de i18next (`{{count}}`) y etiquetas (`<strong>`, `<browse>`), que se conservan tal cual.
 - **Plurales de React:** son dos cadenas con sufijo, `… deleted successfully._one` y `…_other`. Se traducen las dos.
 - **Sin traducción:** las cadenas salen en inglés.
-- **Página de login:** no usa i18next. El servidor le pasa sus textos ya traducidos (`window.__LOGIN_CONFIG__.i18n`, desde `lib/Controller/Login.php` con `__()`). Se cambian en el `.mo` y se pueden comprobar sin sesión, como hace el test de integración.
+- **Página de login:** no usa i18next. El servidor le pasa sus textos ya traducidos (`window.__LOGIN_CONFIG__.i18n`, desde `lib/Controller/Login.php` con `__()`). Se cambian en el `.mo` y se pueden comprobar sin sesión.
 - **Idioma:**
   - Se usa el de la preferencia del usuario o, si no tiene, el del navegador, porque Xibo trae activada la detección (`DETECT_LANGUAGE=1`).
   - Si el navegador no pide un idioma que Xibo tenga, se usa el idioma por defecto (`DEFAULT_LANGUAGE`).
@@ -132,21 +132,22 @@ msgstr "{{count}} pantalla eliminada correctamente."
 
 ## Tests
 
-`tests/run.sh` ejecuta lo mismo que GitHub Actions en cada push y pull request ([`ci.yml`](../.github/workflows/ci.yml)). Solo necesita Docker, y Python 3 para la integración:
+`tests/run.sh` ejecuta lo mismo que GitHub Actions en cada push y pull request ([`ci.yml`](../.github/workflows/ci.yml)). Solo necesita Docker:
 
 | Test | Qué comprueba |
 |---|---|
 | `po` | Con GNU gettext (Debian 13), contra el `default.pot` de la imagen: `es.po` está en formato canónico (`msgcat --sort-output` no cambia nada), es válido (`msgfmt --check`) y tiene todas las cadenas (`msgcmp`). |
 | `unit` | `tests/unit.php`, con el PHP de la imagen: las reglas de los marcadores, la conversión a i18next y el formato del JSON (`lib.php`). |
 | `build` | `./build.sh` termina sin errores y no cambia `es.upstream.json` (si lo cambia, falta hacer commit de él). |
-| `integration` | Un Xibo desechable con su MySQL (`tests/compose.yaml`) y los ficheros de `generated/` montados como dice el README. Sin iniciar sesión, `tests/integration.py` comprueba dos cosas. Primero, que cada texto del login, pedido en español, es la traducción del `es.mo` generado, y que al menos uno es de `es.po` y no del `es.mo` de Xibo. Segundo, que `/app/locale/langs/es.json` es el generado, byte a byte. |
 
 ```bash
 tests/run.sh                  # todos, en este orden
 tests/run.sh po unit          # solo esos
 ```
 
-Al terminar en local, `docker rmi debian:13-slim mysql:8.4` deja Docker limpio.
+Los tests no levantan ningún Xibo: comprueban el catálogo y la build, que ya verifica las rutas de los dos ficheros en la imagen y lee el resultado con la librería de Xibo. Que un CMS use de verdad los ficheros montados solo puede cambiar con una versión nueva de Xibo, y se comprueba a mano en un CMS de prueba ([nueva versión de Xibo](#nueva-versión-de-xibo)).
+
+Al terminar en local, `docker rmi debian:13-slim` deja Docker limpio.
 
 ## Criterios de traducción
 
@@ -230,7 +231,7 @@ Las páginas de un CMS de prueba están vacías: las filas de las tablas y mucho
 Una versión nueva trae sus propios `es.mo`, `es.json` y `default.pot`: el catálogo se vuelve a aplicar sobre los suyos y hay que ponerlo al día con las cadenas que cambien.
 
 1. Poner la versión nueva en `XIBO_VERSION` y ejecutar `./build.sh` (descarga la imagen si no está).
-2. Si se para porque falta un fichero o porque falla la conversión de marcadores, Xibo ha cambiado su forma de traducir. Hay que revisar `lib/Helper/Translate.php` y `web/app/assets/i18n-*.js` de la versión nueva, y adaptar `build.php`, los montajes del README y `tests/compose.yaml`.
+2. Si se para porque falta un fichero o porque falla la conversión de marcadores, Xibo ha cambiado su forma de traducir. Hay que revisar `lib/Helper/Translate.php` y `web/app/assets/i18n-*.js` de la versión nueva, y adaptar `build.php` y los montajes del README.
 3. Revisar el informe, que compara con `es.upstream.json` (la traducción de Xibo en la build anterior):
    - **ERROR: not a string of Xibo …**: Xibo cambió o quitó ese texto en inglés. Si lo cambió, la cadena nueva sale en *not in es.po*: pasar la traducción a la cadena nueva, adaptada. Si lo quitó, borrar la entrada.
    - **not in es.po**: cadenas nuevas de la versión. Traducirlas con los [criterios](#criterios-de-traducción) y localizar dónde salen ([buscar cadenas sin traducir](#buscar-cadenas-sin-traducir)).
@@ -241,7 +242,7 @@ Una versión nueva trae sus propios `es.mo`, `es.json` y `default.pot`: el catá
    - [lo que no se puede traducir](#lo-que-no-se-puede-traducir-así), por si ha cambiado;
    - las [cadenas que se dejan en inglés](#espo): que Xibo sigue comparando ese texto y que no compara otros (`grep -rn 'str_contains(\$e->getMessage()' lib/` en la imagen nueva).
 4. Editar `es.po`, actualizar su `POT-Creation-Date` con la del `default.pot` nuevo, normalizarlo, construir y ejecutar `tests/run.sh`.
-5. Revisar en el navegador en un CMS de prueba de la versión nueva.
+5. Comprobar en un CMS de prueba de la versión nueva, con `generated/` montado como dice el README: la página de login en español (pedida con `Accept-Language: es`), `/app/locale/langs/es.json` igual al generado, y un repaso en el navegador ([revisar en el navegador](#revisar-en-el-navegador)).
 6. Commit de `XIBO_VERSION`, `es.po` y `es.upstream.json`, y publicar la release `<versión>-1`.
 
 Las releases de la versión anterior siguen publicadas para quien no haya actualizado Xibo.
